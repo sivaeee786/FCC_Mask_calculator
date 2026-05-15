@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FCC § 90.210 Emission Mask Calculator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #d1d5db;
+      --accent: #2563eb;
+      --accent2: #0f766e;
+      --warn: #b45309;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap { max-width: 1340px; margin: 0 auto; padding: 24px; }
+
+    /* Header */
+    .header {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.06);
+    }
+    .header h1 { margin: 0 0 6px; font-size: 26px; }
+    .header p  { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .header a  { color: var(--accent); }
+
+    /* Layout */
+    .grid  { display: grid; grid-template-columns: 340px 1fr; gap: 18px; align-items: start; }
+    .split { display: grid; grid-template-columns: 1fr 420px; gap: 18px; align-items: start; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.06);
+      margin-bottom: 18px;
+    }
+    h2 { margin: 0 0 14px; font-size: 19px; }
+    h3 { margin: 14px 0 8px; font-size: 15px; color: var(--muted); }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin: 12px 0 5px;
+      color: var(--text);
+    }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 14px;
+      background: #fff;
+    }
+    input:invalid { border-color: #ef4444; }
+
+    .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    button {
+      border: none; border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 14px; cursor: pointer;
+      color: #fff; background: var(--accent);
+      font-weight: 600;
+    }
+    button.secondary { background: var(--accent2); }
+
+    /* Metrics */
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+    .metric { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 11px; }
+    .metric .k { font-size: 11px; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .4px; }
+    .metric .v { font-size: 17px; font-weight: 700; color: var(--accent2); }
+
+    /* Chart */
+    .chart-wrap { position: relative; width: 100%; height: 480px; }
+
+    /* SA-style limit table */
+    .sa-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      background: #1a1f2e;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .sa-table th {
+      background: #252d3e;
+      color: #8fa3c8;
+      font-weight: 600;
+      font-size: 12px;
+      padding: 9px 14px;
+      border: 1px solid #323d52;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .sa-table td {
+      padding: 10px 14px;
+      border: 1px solid #262f42;
+      text-align: center;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #c8d6ee;
+    }
+    .sa-table td.zone-lbl {
+      font-weight: 700;
+      font-size: 14px;
+      color: #ffffff;
+      background: #1e2639;
+      width: 34px;
+    }
+    .sa-table tr:nth-child(odd)  td:not(.zone-lbl) { background: #1c2335; }
+    .sa-table tr:nth-child(even) td:not(.zone-lbl) { background: #18202e; }
+    .sa-table td.lim { color: #5ddbb8; font-weight: 600; }
+    .sa-table td.freq { color: #a8bfe0; }
+
+    /* SA notes */
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #0f172a;
+      color: #d1fae5;
+      padding: 14px;
+      border-radius: 12px;
+      margin: 0;
+      font-size: 12.5px;
+      line-height: 1.6;
+      overflow: auto;
+    }
+
+    .note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+    .warn { font-size: 12px; color: var(--warn); margin-top: 6px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 7px 10px; display: none; }
+    .warn.visible { display: block; }
+
+    @media (max-width: 980px) {
+      .grid, .split { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>FCC § 90.210 Emission Mask Calculator</h1>
+    <p>
+      Computes and plots emission masks per
+      <a href="https://www.ecfr.gov/current/title-47/chapter-I/subchapter-D/part-90/subpart-I/section-90.210"
+         target="_blank" rel="noopener">47 CFR § 90.210</a>.
+      Supports all seven masks defined in § 90.210: A, B, C, D, F, I, J.
+      Mask D transition uses <strong>7.27·(f<sub>d</sub>−2.88) dB</strong>; Masks F/J use logarithmic formulas;
+      Masks A/B/I use fixed-offset step functions.
+    </p>
+  </div>
+
+  <!-- Inputs + Chart -->
+  <div class="grid">
+
+    <!-- Left: inputs -->
+    <div class="card">
+      <h2>Inputs</h2>
+
+      <label for="pdbm">Transmitter power (dBm)</label>
+      <input id="pdbm" type="number" value="30" step="0.1" min="-30" max="60" />
+
+      <label for="center">Center frequency (MHz)</label>
+      <input id="center" type="number" value="450" step="0.1" min="1" max="6000" />
+
+      <label for="bw">Channel bandwidth (kHz)</label>
+      <input id="bw" type="number" value="12.5" step="0.1" min="1" max="500" />
+
+      <label for="mask">Mask type</label>
+      <select id="mask">
+        <option value="D" selected>Mask D — 12.5 kHz channel (7.27·(f_d−2.88) formula)</option>
+        <option value="A">Mask A — J3E / SSB emission</option>
+        <option value="B">Mask B — DSB with audio low-pass filter</option>
+        <option value="C">Mask C — FM without audio low-pass filter</option>
+        <option value="F">Mask F — 220–222 MHz band (30+20·(f_d−2) formula)</option>
+        <option value="I">Mask I — with audio low-pass filter (fixed offsets)</option>
+        <option value="J">Mask J — without audio low-pass filter (log formulas)</option>
+      </select>
+
+      <div id="bwWarn" class="warn" id="bwWarn"></div>
+
+      <div class="row">
+        <button onclick="updateAll()">Calculate</button>
+        <button class="secondary" onclick="loadExample()">Load Example</button>
+      </div>
+
+      <!-- Metrics -->
+      <div class="metrics">
+        <div class="metric">
+          <div class="k">Power</div>
+          <div class="v" id="metPowerW">—</div>
+        </div>
+        <div class="metric">
+          <div class="k">Far-out limit</div>
+          <div class="v" id="metFarLimit">—</div>
+        </div>
+        <div class="metric">
+          <div class="k">Mask</div>
+          <div class="v" id="metMask">—</div>
+        </div>
+      </div>
+
+      <h3>Regulatory source</h3>
+      <div class="note">
+        <strong>Mask D transition:</strong> 7.27·(f<sub>d</sub> − 2.88) dB for 5.625 kHz ≤ f<sub>d</sub> ≤ 12.5 kHz<br>
+        <strong>Mask D far-out:</strong> min(50 + 10·log<sub>10</sub> P, 70) dBc for |f<sub>d</sub>| &gt; 12.5 kHz<br>
+        <strong>Masks A/B/C far-out:</strong> min(43 + 10·log<sub>10</sub> P, 70) dBc beyond 250% BW<br>
+        Source: 47 CFR § 90.210 (eCFR, Title 47, Part 90, Subpart I)
+      </div>
+    </div>
+
+    <!-- Right: chart -->
+    <div class="card">
+      <h2>Emission Mask Plot</h2>
+      <div class="chart-wrap">
+        <canvas id="maskChart"></canvas>
+      </div>
+      <div class="note">
+        Y-axis: dBc relative to unmodulated carrier power.
+        The mask is the maximum permitted emission at each frequency offset.
+        Far-out region (highlighted) updates dynamically with transmitter power.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Table + SA Notes -->
+  <div class="split">
+
+    <div class="card">
+      <h2>Mask Limit Table</h2>
+      <table class="sa-table">
+        <thead>
+          <tr>
+            <th rowspan="2"></th>
+            <th colspan="2">Frequency Range</th>
+            <th colspan="2">Abs Limit</th>
+          </tr>
+          <tr>
+            <th>Start</th>
+            <th>Stop</th>
+            <th>Start</th>
+            <th>Stop</th>
+          </tr>
+        </thead>
+        <tbody id="limitTable"></tbody>
+      </table>
+      <div class="note">
+        Abs Limit = carrier power − mask attenuation (dBm).
+        Mask is symmetric; table shows positive offsets.
+        Zone B stop matches the sloped mask limit at 12.5 kHz per § 90.210.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Agilent / Keysight SA Setup Notes</h2>
+      <pre id="saText">Press Calculate to generate setup notes.</pre>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Unit helpers
+// ---------------------------------------------------------------------------
+function dbmToW(dbm) {
+  return Math.pow(10, (dbm - 30) / 10);
+}
+
+function fmt(v, d = 2) {
+  return typeof v === 'number' ? v.toFixed(d) : v;
+}
+
+// ---------------------------------------------------------------------------
+// Mask data — returns Chart.js {x, y} point arrays
+// ---------------------------------------------------------------------------
+function maskDPoints(pW) {
+  const farOut     = Math.min(50 + 10 * Math.log10(pW), 70);
+  const innerAtten = 7.27 * (5.625 - 2.88);  // 19.957 dBc at 5.625 kHz boundary
+
+  // Duplicate-X pairs create vertical steps matching the SA segment table:
+  //   Zone A  — flat at  0 dBc  from 0 to ±5.625 kHz
+  //   Zone B  — slope from −innerAtten to −70 dBc, ±5.625 to ±12.5 kHz
+  //   Zone C  — flat at −farOut dBc beyond ±12.5 kHz
+  return [
+    { x: -50,    y: -farOut    },
+    { x: -12.5,  y: -farOut    }, { x: -12.5,  y: -70           },
+    { x: -5.625, y: -innerAtten }, { x: -5.625, y:  0             },
+    { x:  0,     y:  0         },
+    { x:  5.625, y:  0         }, { x:  5.625, y: -innerAtten    },
+    { x:  12.5,  y: -70        }, { x:  12.5,  y: -farOut        },
+    { x:  50,    y: -farOut    }
+  ];
+}
+
+function maskAPoints(bwKHz, pW) {
+  const farOut = Math.min(43 + 10 * Math.log10(pW), 70);
+  const b50  = bwKHz * 0.5;
+  const b150 = bwKHz * 1.5;
+  const b250 = bwKHz * 2.5;
+  const span = Math.max(50, b250 + 10);
+  return [
+    { x: -span, y: -farOut },
+    { x: -b250, y: -farOut }, { x: -b250, y: -35 },
+    { x: -b150, y: -35 },    { x: -b150, y: -25 },
+    { x: -b50,  y: -25 },    { x: -b50,  y: 0 },
+    { x: 0,     y: 0 },
+    { x:  b50,  y: 0 },      { x:  b50,  y: -25 },
+    { x:  b150, y: -25 },    { x:  b150, y: -35 },
+    { x:  b250, y: -35 },    { x:  b250, y: -farOut },
+    { x:  span, y: -farOut }
+  ];
+}
+
+function maskBPoints(bwKHz, pW) {
+  const farOut = Math.min(43 + 10 * Math.log10(pW), 70);
+  const b50  = bwKHz * 0.5;
+  const b100 = bwKHz;
+  const b250 = bwKHz * 2.5;
+  const span = Math.max(50, b250 + 10);
+  return [
+    { x: -span, y: -farOut },
+    { x: -b250, y: -farOut }, { x: -b250, y: -35 },
+    { x: -b100, y: -35 },    { x: -b100, y: -25 },
+    { x: -b50,  y: -25 },    { x: -b50,  y: 0 },
+    { x: 0,     y: 0 },
+    { x:  b50,  y: 0 },      { x:  b50,  y: -25 },
+    { x:  b100, y: -25 },    { x:  b100, y: -35 },
+    { x:  b250, y: -35 },    { x:  b250, y: -farOut },
+    { x:  span, y: -farOut }
+  ];
+}
+
+function maskCPoints(bwKHz, pW) {
+  // § 90.210 Mask C:
+  //   5–10 kHz:          83·log10(f_d/5) dB
+  //   10 kHz – 250% BW:  min(29·log10(f_d²/11), 50) dB
+  //   > 250% BW:         min(43 + 10·log10(P), 70) dBc
+  const farOut = Math.min(43 + 10 * Math.log10(pW), 70);
+  const b250   = bwKHz * 2.5;
+  const span   = Math.max(50, b250 + 10);
+  const pts    = [];
+
+  function attenC(fd) {
+    if (fd <= 5)    return 0;
+    if (fd <= 10)   return 83 * Math.log10(fd / 5);
+    if (fd <= b250) return Math.min(29 * Math.log10((fd * fd) / 11), 50);
+    return farOut;
+  }
+
+  pts.push({ x: -span, y: -farOut });
+  // Left side: b250 → 0, step size 0.5 kHz
+  for (let fd = b250; fd >= 0; fd -= 0.5) {
+    pts.push({ x: -fd, y: -attenC(fd) });
+  }
+  // Right side: 0 → b250
+  for (let fd = 0; fd <= b250; fd += 0.5) {
+    pts.push({ x: fd, y: -attenC(fd) });
+  }
+  pts.push({ x: span, y: -farOut });
+  return pts;
+}
+
+// Mask F — 220–222 MHz band
+// Zone A : 0 to 2 kHz (authorized BW edge) — 0 dBc
+// Zone B : 2–3.75 kHz — min(30 + 20·(f_d−2), 55+10·log P, 65) dBc
+// Zone C : > 3.75 kHz — 55 + 10·log P dBc  (no cap)
+function maskFPoints(pW) {
+  const farF  = 55 + 10 * Math.log10(pW);
+  const capF  = Math.min(farF, 65);
+  const pts   = [];
+
+  function attenF(fd) {
+    if (fd <= 2)    return 0;
+    if (fd <= 3.75) return Math.min(30 + 20 * (fd - 2), farF, 65);
+    return farF;
+  }
+
+  pts.push({ x: -50, y: -farF });
+  pts.push({ x: -3.75, y: -farF });
+  // Dense left transition 3.75 → 2 kHz
+  for (let fd = 3.75; fd >= 2; fd -= 0.05) {
+    pts.push({ x: -fd, y: -attenF(fd) });
+  }
+  pts.push({ x: -2, y: 0 });
+  pts.push({ x:  0, y:  0 });
+  pts.push({ x:  2, y:  0 });
+  // Dense right transition 2 → 3.75 kHz
+  for (let fd = 2; fd <= 3.75; fd += 0.05) {
+    pts.push({ x: fd, y: -attenF(fd) });
+  }
+  pts.push({ x:  3.75, y: -farF });
+  pts.push({ x:  50,   y: -farF });
+  return pts;
+}
+
+// Mask I — with audio low-pass filter, fixed offsets
+// Zone A : 0–6.8 kHz — 0 dBc
+// Zone B : 6.8–9.0 kHz — ≥25 dBc
+// Zone C : 9.0–15 kHz  — ≥35 dBc
+// Zone D : >15 kHz      — min(43+10·log P, 70) dBc
+function maskIPoints(pW) {
+  const farI = Math.min(43 + 10 * Math.log10(pW), 70);
+  return [
+    { x: -50,  y: -farI }, { x: -15,  y: -farI }, { x: -15,  y: -35 },
+    { x:  -9,  y: -35   }, { x:  -9,  y: -25   }, { x: -6.8, y: -25 },
+    { x: -6.8, y:   0   }, { x:   0,  y:   0   },
+    { x:  6.8, y:   0   }, { x:  6.8, y: -25   }, { x:   9,  y: -25 },
+    { x:    9, y: -35   }, { x:  15,  y: -35   }, { x:  15,  y: -farI },
+    { x:   50, y: -farI }
+  ];
+}
+
+// Mask J — without audio low-pass filter
+// Zone A : 0–2.5 kHz        — 0 dBc
+// Zone B : 2.5–6.25 kHz     — 53·log10(f_d/2.5) dBc
+// Zone C : 6.25–9.5 kHz     — 103·log10(f_d/3.9) dBc
+// Zone D : >9.5 kHz         — min(157·log10(f_d/5.3), 50+10·log P, 70) dBc
+function maskJPoints(pW) {
+  const farJ = Math.min(50 + 10 * Math.log10(pW), 70);
+  const pts  = [];
+
+  function attenJ(fd) {
+    if (fd <= 2.5)  return 0;
+    if (fd <= 6.25) return 53  * Math.log10(fd / 2.5);
+    if (fd <= 9.5)  return 103 * Math.log10(fd / 3.9);
+    return Math.min(157 * Math.log10(fd / 5.3), farJ);
+  }
+
+  pts.push({ x: -50, y: -farJ });
+  // Left: 50 → 2.5 kHz (dense in curved zones)
+  for (let fd = 50; fd >= 2.5; fd -= (fd > 9.5 ? 1 : 0.1)) {
+    pts.push({ x: -fd, y: -attenJ(fd) });
+  }
+  pts.push({ x: -2.5, y: 0 });
+  pts.push({ x:    0, y: 0 });
+  pts.push({ x:  2.5, y: 0 });
+  // Right: 2.5 → 50 kHz
+  for (let fd = 2.5; fd <= 50; fd += (fd < 9.5 ? 0.1 : 1)) {
+    pts.push({ x: fd, y: -attenJ(fd) });
+  }
+  pts.push({ x: 50, y: -farJ });
+  return pts;
+}
+
+function getPoints(mask, bwKHz, pW) {
+  switch (mask) {
+    case 'A': return maskAPoints(bwKHz, pW);
+    case 'B': return maskBPoints(bwKHz, pW);
+    case 'C': return maskCPoints(bwKHz, pW);
+    case 'F': return maskFPoints(pW);
+    case 'I': return maskIPoints(pW);
+    case 'J': return maskJPoints(pW);
+    default:  return maskDPoints(pW);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Chart
+// ---------------------------------------------------------------------------
+let chart = null;
+
+function renderChart(mask, bwKHz, pW) {
+  const points = getPoints(mask, bwKHz, pW);
+  const ctx = document.getElementById('maskChart').getContext('2d');
+  if (chart) chart.destroy();
+
+  const xMin = Math.min(...points.map(p => p.x));
+  const xMax = Math.max(...points.map(p => p.x));
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: `Mask ${mask} limit line`,
+        data: points,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.08)',
+        fill: true,
+        borderWidth: 2.5,
+        pointRadius: (ctx) => {
+          // Show dots only at the key breakpoints (non-dense Mask C)
+          return points.length < 20 ? 4 : 0;
+        },
+        pointHoverRadius: 5,
+        tension: 0,
+        parsing: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 200 },
+      plugins: {
+        legend: { display: false },
+        title: {
+          display: true,
+          text: `FCC § 90.210 Mask ${mask} — Center: ${document.getElementById('center').value} MHz`,
+          font: { size: 13 }
+        },
+        tooltip: {
+          callbacks: {
+            label: (item) => `${item.parsed.x.toFixed(3)} kHz offset: ${item.parsed.y.toFixed(2)} dBc`
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: xMin,
+          max: xMax,
+          title: { display: true, text: 'Frequency offset from channel center (kHz)' },
+          grid: { color: '#e5e7eb' }
+        },
+        y: {
+          min: -80,
+          max: 10,
+          title: { display: true, text: 'Emission limit (dBc)' },
+          grid: { color: '#e5e7eb' },
+          ticks: {
+            callback: (v) => `${v} dBc`
+          }
+        }
+      }
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// SA-format table helpers
+// ---------------------------------------------------------------------------
+function fmtFreq(kHz) {
+  if (kHz === 0) return '0.0000 Hz';
+  return kHz < 10
+    ? kHz.toFixed(4) + ' kHz'
+    : kHz.toFixed(3) + ' kHz';
+}
+
+function fmtDbm(v) {
+  return (v >= 0 ? '+' : '') + v.toFixed(2) + ' dBm';
+}
+
+// Per-mask far-out attenuation (positive dBc value)
+function farOutAtten(mask, pW) {
+  if (mask === 'D') return Math.min(50 + 10 * Math.log10(pW), 70);
+  if (mask === 'F') return 55 + 10 * Math.log10(pW);           // no cap per § 90.210 Mask F
+  if (mask === 'J') return Math.min(50 + 10 * Math.log10(pW), 70);
+  return Math.min(43 + 10 * Math.log10(pW), 70);               // A, B, C, I
+}
+
+// Build SA table rows: absLimStart/Stop = carrier_dBm − attenuation_dBc
+function getSARows(mask, bwKHz, pDbm, pW) {
+  const farOut = farOutAtten(mask, pW);
+
+  if (mask === 'D') {
+    const innerAtten = 7.27 * (5.625 - 2.88);   // 19.957 dBc at 5.625 kHz
+    return [
+      { lbl: 'A', fStart: 0,     fStop: 5.625,  absStart: pDbm,               absStop: pDbm },
+      { lbl: 'B', fStart: 5.625, fStop: 12.5,   absStart: pDbm - innerAtten,  absStop: pDbm - 70 },
+      { lbl: 'C', fStart: 12.5,  fStop: 50,     absStart: pDbm - farOut,      absStop: pDbm - farOut }
+    ];
+  }
+  if (mask === 'A') {
+    return [
+      { lbl: 'A', fStart: 0,           fStop: bwKHz*0.5,  absStart: pDbm,       absStop: pDbm },
+      { lbl: 'B', fStart: bwKHz*0.5,   fStop: bwKHz*1.5,  absStart: pDbm - 25,  absStop: pDbm - 25 },
+      { lbl: 'C', fStart: bwKHz*1.5,   fStop: bwKHz*2.5,  absStart: pDbm - 35,  absStop: pDbm - 35 },
+      { lbl: 'D', fStart: bwKHz*2.5,   fStop: bwKHz*5,    absStart: pDbm - farOut, absStop: pDbm - farOut }
+    ];
+  }
+  if (mask === 'B') {
+    return [
+      { lbl: 'A', fStart: 0,           fStop: bwKHz*0.5,  absStart: pDbm,       absStop: pDbm },
+      { lbl: 'B', fStart: bwKHz*0.5,   fStop: bwKHz,      absStart: pDbm - 25,  absStop: pDbm - 25 },
+      { lbl: 'C', fStart: bwKHz,       fStop: bwKHz*2.5,  absStart: pDbm - 35,  absStop: pDbm - 35 },
+      { lbl: 'D', fStart: bwKHz*2.5,   fStop: bwKHz*5,    absStart: pDbm - farOut, absStop: pDbm - farOut }
+    ];
+  }
+  // Mask C
+  if (mask === 'C') {
+    const at5  = 0;
+    const at10 = 83 * Math.log10(10 / 5);
+    const atBW = Math.min(29 * Math.log10((bwKHz * 2.5) ** 2 / 11), 50);
+    return [
+      { lbl: 'A', fStart: 0,           fStop: 5,          absStart: pDbm,          absStop: pDbm },
+      { lbl: 'B', fStart: 5,           fStop: 10,         absStart: pDbm - at5,    absStop: pDbm - at10 },
+      { lbl: 'C', fStart: 10,          fStop: bwKHz*2.5,  absStart: pDbm - at10,   absStop: pDbm - atBW },
+      { lbl: 'D', fStart: bwKHz*2.5,   fStop: bwKHz*5,    absStart: pDbm - farOut, absStop: pDbm - farOut }
+    ];
+  }
+
+  // Mask F — 220–222 MHz band
+  if (mask === 'F') {
+    const capF     = Math.min(farOut, 65);
+    const atZoneB0 = Math.min(30, farOut, 65);   // at fd = 2 kHz
+    return [
+      { lbl: 'A', fStart: 0,    fStop: 2,    absStart: pDbm,            absStop: pDbm },
+      { lbl: 'B', fStart: 2,    fStop: 3.75, absStart: pDbm - atZoneB0, absStop: pDbm - capF },
+      { lbl: 'C', fStart: 3.75, fStop: 50,   absStart: pDbm - farOut,   absStop: pDbm - farOut }
+    ];
+  }
+
+  // Mask I — fixed offsets with audio LPF
+  if (mask === 'I') {
+    return [
+      { lbl: 'A', fStart: 0,   fStop: 6.8,  absStart: pDbm,        absStop: pDbm },
+      { lbl: 'B', fStart: 6.8, fStop: 9.0,  absStart: pDbm - 25,   absStop: pDbm - 25 },
+      { lbl: 'C', fStart: 9.0, fStop: 15,   absStart: pDbm - 35,   absStop: pDbm - 35 },
+      { lbl: 'D', fStart: 15,  fStop: 50,   absStart: pDbm - farOut, absStop: pDbm - farOut }
+    ];
+  }
+
+  // Mask J — without audio LPF (logarithmic formulas)
+  if (mask === 'J') {
+    const atB_stop = 53  * Math.log10(6.25 / 2.5);     // at 6.25 kHz ≈ 21.09 dBc
+    const atC_stop = 103 * Math.log10(9.5  / 3.9);     // at 9.5  kHz ≈ 39.83 dBc
+    return [
+      { lbl: 'A', fStart: 0,    fStop: 2.5,  absStart: pDbm,            absStop: pDbm },
+      { lbl: 'B', fStart: 2.5,  fStop: 6.25, absStart: pDbm,            absStop: pDbm - atB_stop },
+      { lbl: 'C', fStart: 6.25, fStop: 9.5,  absStart: pDbm - atB_stop, absStop: pDbm - atC_stop },
+      { lbl: 'D', fStart: 9.5,  fStop: 50,   absStart: pDbm - atC_stop, absStop: pDbm - farOut }
+    ];
+  }
+
+  // Fallback (should not reach)
+  return [];
+}
+
+// ---------------------------------------------------------------------------
+// Table
+// ---------------------------------------------------------------------------
+function renderTable(mask, bwKHz, pDbm, pW) {
+  const rows  = getSARows(mask, bwKHz, pDbm, pW);
+  const tbody = document.getElementById('limitTable');
+  tbody.innerHTML = '';
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td class="zone-lbl">${r.lbl}</td>` +
+      `<td class="freq">${fmtFreq(r.fStart)}</td>` +
+      `<td class="freq">${fmtFreq(r.fStop)}</td>` +
+      `<td class="lim">${fmtDbm(r.absStart)}</td>` +
+      `<td class="lim">${fmtDbm(r.absStop)}</td>`;
+    tbody.appendChild(tr);
+  });
+  return rows;
+}
+
+// ---------------------------------------------------------------------------
+// SA Notes
+// ---------------------------------------------------------------------------
+function buildSAText(mask, dbm, pW, centerMHz, bwKHz, saRows) {
+  const farOut  = farOutAtten(mask, pW);
+  const spanKHz = ['F','I','J'].includes(mask) ? 120 : (bwKHz < 25 ? 200 : bwKHz * 8);
+
+  const lines = [
+    `FCC § 90.210 Mask ${mask} — Agilent/Keysight SA Setup`,
+    '─'.repeat(44),
+    `Transmitter power : ${dbm.toFixed(2)} dBm  (${pW.toExponential(4)} W)`,
+    `Center frequency  : ${centerMHz} MHz`,
+    `Channel bandwidth : ${bwKHz} kHz`,
+    `Far-out limit     : ${farOut.toFixed(3)} dBc`,
+    '',
+    'Limit segments (Abs Limit, upper, ± symmetric):',
+  ];
+
+  saRows.forEach(r => {
+    const absFreqStart = (centerMHz * 1e6 + r.fStart * 1e3) / 1e6;  // MHz
+    const absFreqStop  = (centerMHz * 1e6 + r.fStop  * 1e3) / 1e6;
+    lines.push(
+      `  Seg ${r.lbl}: ${fmtFreq(r.fStart).padEnd(12)}→ ${fmtFreq(r.fStop).padEnd(12)}` +
+      `  ${fmtDbm(r.absStart)} → ${fmtDbm(r.absStop)}`
+    );
+  });
+
+  lines.push('');
+  lines.push('Agilent MXA / EXA steps:');
+  lines.push('  1) Mode > Spectrum Analyzer');
+  lines.push(`  2) Frequency > Center Freq = ${centerMHz} MHz`);
+  lines.push(`  3) Frequency > Span = ${spanKHz.toFixed(0)} kHz`);
+  lines.push('  4) Meas Setup > Limit Lines > Edit Limit Line');
+  lines.push('  5) Type = Upper  |  Units = Absolute (dBm)');
+  lines.push('  6) Add segments from table — set Freq + Amplitude at Start & Stop');
+  lines.push('  7) File > Save State for reuse');
+
+  return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Main update
+// ---------------------------------------------------------------------------
+function updateAll() {
+  const dbm      = parseFloat(document.getElementById('pdbm').value);
+  const centerMHz= parseFloat(document.getElementById('center').value);
+  const bwKHz    = parseFloat(document.getElementById('bw').value);
+  const mask     = document.getElementById('mask').value;
+
+  if (isNaN(dbm) || isNaN(centerMHz) || isNaN(bwKHz)) return;
+
+  const pW     = dbmToW(dbm);
+  const farOut = farOutAtten(mask, pW);
+
+  // Metrics
+  document.getElementById('metPowerW').textContent   = pW.toExponential(4) + ' W';
+  document.getElementById('metFarLimit').textContent = farOut.toFixed(3) + ' dBc';
+  document.getElementById('metMask').textContent     = 'Mask ' + mask;
+
+  // BW warning — masks with fixed breakpoints ignore BW input
+  const fixedBWMasks = ['D', 'F', 'I', 'J'];
+  const warn = document.getElementById('bwWarn');
+  const warnMsgs = {
+    D: 'Mask D has fixed breakpoints (±5.625 kHz, ±12.5 kHz) for 12.5 kHz channels — BW input affects SA notes only.',
+    F: 'Mask F has fixed breakpoints (2 kHz, 3.75 kHz) for the 220–222 MHz band — BW input affects SA notes only.',
+    I: 'Mask I uses fixed offsets (6.8, 9, 15 kHz) — BW input affects SA notes only.',
+    J: 'Mask J uses fixed offsets (2.5, 6.25, 9.5 kHz) — BW input affects SA notes only.'
+  };
+  if (fixedBWMasks.includes(mask)) {
+    warn.textContent = warnMsgs[mask];
+    warn.classList.add('visible');
+  } else {
+    warn.classList.remove('visible');
+  }
+
+  const saRows = renderTable(mask, bwKHz, dbm, pW);
+  renderChart(mask, bwKHz, pW);
+  document.getElementById('saText').textContent =
+    buildSAText(mask, dbm, pW, centerMHz, bwKHz, saRows);
+}
+
+function loadExample() {
+  document.getElementById('pdbm').value   = '30';
+  document.getElementById('center').value = '450';
+  document.getElementById('bw').value     = '12.5';
+  document.getElementById('mask').value   = 'D';
+  updateAll();
+}
+
+// Auto-update on changes
+['pdbm', 'center', 'bw'].forEach(id =>
+  document.getElementById(id).addEventListener('input', updateAll)
+);
+document.getElementById('mask').addEventListener('change', updateAll);
+
+loadExample();
+</script>
+</body>
+</html>
